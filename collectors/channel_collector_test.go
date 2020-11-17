@@ -3,13 +3,14 @@ package collectors
 import (
 	"testing"
 
+	"github.com/lightninglabs/lndclient"
+
 	"github.com/btcsuite/btcutil"
-	"github.com/lightningnetwork/lnd/lnrpc"
 	"github.com/stretchr/testify/require"
 )
 
 var (
-	remotePolicies = map[uint64]*lnrpc.RoutingPolicy{
+	remotePolicies = map[uint64]*lndclient.RoutingPolicy{
 		1: {
 			FeeBaseMsat:      20000,
 			FeeRateMilliMsat: 10000,

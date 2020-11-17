@@ -6,9 +6,11 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/lightningnetwork/lnd/lnrpc/verrpc"
+
 	flags "github.com/jessevdk/go-flags"
+	"github.com/lightninglabs/lndclient"
 	"github.com/lightninglabs/lndmon/collectors"
-	"github.com/lightninglabs/loop/lndclient"
 	"github.com/lightningnetwork/lnd/routing/route"
 )
 
@@ -30,14 +32,24 @@ func start() error {
 		return err
 	}
 
-	// Initialize our lnd client.
-	lnd, err := lndclient.NewBasicClient(
-		cfg.Lnd.Host, cfg.Lnd.TLSPath, cfg.Lnd.MacaroonDir,
-		cfg.Lnd.Network, lndclient.MacFilename("readonly.macaroon"),
+	// Initialize our lnd client, requiring at least lnd v0.11.
+	lnd, err := lndclient.NewLndServices(
+		&lndclient.LndServicesConfig{
+			LndAddress:         cfg.Lnd.Host,
+			Network:            lndclient.Network(cfg.Lnd.Network),
+			CustomMacaroonPath: "/root/.lnd/readonly.macaroon",
+			TLSPath:            cfg.Lnd.TLSPath,
+			CheckVersion: &verrpc.Version{
+				AppMajor: 0,
+				AppMinor: 11,
+				AppPatch: 0,
+			},
+		},
 	)
 	if err != nil {
 		return err
 	}
+	defer lnd.Close()
 
 	monitoringCfg := collectors.MonitoringConfig{}
 	if cfg.PrimaryNode != "" {
@@ -51,7 +63,7 @@ func start() error {
 	// Start our Prometheus exporter. This exporter spawns a goroutine
 	// that pulls metrics from our lnd client on a set interval.
 	exporter := collectors.NewPrometheusExporter(
-		cfg.Prometheus, lnd, &monitoringCfg,
+		cfg.Prometheus, &lnd.LndServices, &monitoringCfg,
 	)
 	if err := exporter.Start(); err != nil {
 		return err
